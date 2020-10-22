@@ -3,18 +3,17 @@
 import os
 
 import discord 
+from discord.ext import commands
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-TOKEN = os.getenv('DISCORD_TOKEN')
-
-client = discord.Client()
+client = commands.Bot(command_prefix = '!')
 
 @client.event
-async def on_ready(): 
-        print(f'{client.user} has connected to Discord!')
+async def on_ready():
+        print("Bot Is Ready")
+
+@client.command()
+async def hello(ctx):
+        await ctx.send('Hello!') 
 
 
-client.run(TOKEN)
+client.run('')

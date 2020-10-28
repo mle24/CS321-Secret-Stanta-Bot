@@ -65,12 +65,14 @@ async def join(ctx):
 
     event_participants_dicts = [ item.to_dict() for item in db.collection('event_participants').get() ]
     for event_participant in event_participants_dicts:
-        if (str(event_id) == event_participant['event_id']) and (str(msg_auth) in event_participant['participants']):
-            await ctx.send(f'{ctx.message.author}, you have already been added to the event! :rage:')
-            return
-        else:
-            collection = db.collection('event_participants')
-            res = collection.document(f'{event_id}').update({'participants': {f'{msg_auth}': [] } } )
+        if (str(event_id) == event_participant['event_id']):
+            
+            if (str(msg_auth) in event_participant['participants']):
+                await ctx.send(f'{ctx.message.author}, you have already been added to the event! :rage:')
+                return
+            else:
+                collection = db.collection('event_participants')
+                res = collection.document(f'{event_id}').update({'participants': {f'{msg_auth}': [] } } )
 
     await ctx.send(f'{ctx.message.author} has been added to the event! :partying_face:')
 

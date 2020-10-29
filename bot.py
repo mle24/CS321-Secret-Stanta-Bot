@@ -7,9 +7,7 @@ import datetime
 cred = credentials.Certificate("./botprivatekey.json")
 firebase_admin.initialize_app(cred)
 
-
-db = firestore.client()  
-
+db = firestore.client() 
 
 client = commands.Bot(command_prefix = '!')
 
@@ -17,7 +15,6 @@ client = commands.Bot(command_prefix = '!')
 async def on_ready():
     print("Bot Is Ready")
         
-
 event_id = ''
 event_in_progress_flag = False
 
@@ -72,7 +69,7 @@ async def join(ctx):
                 return
             else:
                 collection = db.collection('event_participants')
-                res = collection.document(f'{event_id}').update({'participants': {f'{msg_auth}': [] } } )
+                res = collection.document(f'{event_id}').update({f'participants.{msg_auth}': []} )
 
     await ctx.send(f'{ctx.message.author} has been added to the event! :partying_face:')
 
@@ -92,7 +89,7 @@ async def add(ctx, *, wish):
     msg_auth = ctx.message.author.id
 
     collection = db.collection('event_participants')
-    res = collection.document(f'{event_id}').update({'participants': {f'{msg_auth}': firestore.ArrayUnion([f'{wish}']) } } )
+    res = collection.document(f'{event_id}').update({f'participants.{msg_auth}': firestore.ArrayUnion([f'{wish}'])})
 
     user = client.get_user(msg_auth)
     await user.send(f'I added {wish} to your wishlist :upside_down:')
@@ -109,13 +106,12 @@ async def _list(ctx):
     msg_auth = ctx.message.author.id
 
     event_participants_dict = db.collection('event_participants').document(f'{event_id}').get().to_dict()
-    print(event_participants_dict)
+
     user = client.get_user(msg_auth)
     ulist = event_participants_dict['participants'].get(f'{msg_auth}')
-    print(ulist)
+
     await user.send(f'Here is your wishlist: {ulist}')
-    print('done')
             
 
 
-client.run('bot_token')
+client.run('NzY1MzgxOTA3MTM5MTMzNTIw.X4T_cg.mE8yghJf8AS8sjiPnDvG7xDPM1M')

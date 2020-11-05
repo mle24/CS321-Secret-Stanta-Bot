@@ -141,7 +141,7 @@ async def randomize(ctx):
     for i in range(len(users)): 
         pairs[users[i].id] = users[(i+1)%len(users)]
 
-    
+
     event_ref.update(pairs)
     await ctx.send('Everyone has been randomly matched run !recipient in the server to get your recipient:)')
 
@@ -161,4 +161,4 @@ async def recipient(ctx):
 
     await user.send(f'Your recipient is {rec_name}!!! :santa: ')
 
-client.run('NzY1MzgxOTA3MTM5MTMzNTIw.X4T_cg.bUP9idQ9vItzCPJdjVQP-5Hd-aA')
+client.run('')

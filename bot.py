@@ -119,6 +119,10 @@ async def _list(ctx):
 #Fix-Me     
 @client.command()
 async def randomize(ctx): 
+    '''
+        Randomly pair users
+    '''
+
     pairs = {}
     guild_id = ctx.message.guild.id
     author_id = ctx.message.author.id
@@ -148,6 +152,9 @@ async def randomize(ctx):
 
 @client.command()
 async def recipient(ctx): 
+    '''
+        get recipient
+    '''
     guild_id = ctx.message.guild.id
     author_id = ctx.message.author.id
 

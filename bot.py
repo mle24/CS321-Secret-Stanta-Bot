@@ -1,8 +1,11 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
-import discord 
+
+import discord  
 from discord.ext import commands
+
 import datetime
+import random
 
 cred = credentials.Certificate("./botprivatekey.json")
 firebase_admin.initialize_app(cred)
@@ -20,19 +23,16 @@ async def on_ready():
 
 @client.command()
 async def start(ctx):
-    #Starts Event
-
-    global event_in_progress_flag
-    global event_id
-
-   
-    
+    '''
+        Starts Event
+    '''
     author_id = ctx.message.author.id
     guild_id = ctx.message.guild.id
     
     doc_ref = db.collection('events').document(f'{guild_id}')
     if doc_ref.get().exists: 
        await ctx.send('Server already has an ongoing event')
+       await ctx.send('If you would like to participate, use the !join command') 
     else:
         doc_ref.set({
             'host': f'{author_id}',
@@ -59,77 +59,106 @@ async def join(ctx):
         await ctx.send('No event in progress, use the start command to begin an event')
         return
 
-    
+    user = client.get_user(author_id)
     #check if user exist in users collection
     if not user_ref.get().exists:
         user_ref.set({
+            'name' : f'{user.name}',
             'wishlist': [], 
         })
     
     #add user to list of users in the server
     event_ref.update({'users': firestore.ArrayUnion([user_ref])})
 
+   
     await ctx.send(f'{ctx.message.author} has been added to the event! :partying_face:')
+    await user.send("Use this channel to add/remove items to your wishlist")
+    
     
 
-#FIX-ME
+
 @client.command()
 async def add(ctx, *, wish):
     '''
         Add item into wishlist
     '''
-    global event_id
-    global event_in_progress_flag
+   
+    author_id = ctx.message.author.id
+   
+   
+    user_ref = db.collection('users').document(f'{author_id}')
+    
 
-    if not event_in_progress_flag:
-        await ctx.send('No event in progress, use the start command to begin an event')
-        return
-
-    msg_auth = ctx.message.author.id
-
-    collection = db.collection('event_participants')
-    res = collection.document(f'{event_id}').update({f'participants.{msg_auth}': firestore.ArrayUnion([f'{wish}'])})
-
-    user = client.get_user(msg_auth)
+    user_ref.update({'wishlist': firestore.ArrayUnion([f'{wish}'])})
+    user = client.get_user(author_id) 
     await user.send(f'I added {wish} to your wishlist :upside_down:')
 
 
-#FIX-ME
+#FIX-ME  
 @client.command(aliases=['list'])
 async def _list(ctx):
     '''
         Retrieve recipeint wishlist 
     '''
-    global event_id
-    global event_in_progress_flag
 
-    if not event_in_progress_flag:
-        await ctx.send('No event in progress, use the start command to begin an event')
-        return
+    author_id = ctx.message.author.id
+    guild_id = ctx.message.guild.id
+    event_ref = db.collection('events').document(f'{guild_id}')
+    event = event_ref.get().to_dict()
+    
+    rec_ref = event[f'{author_id}']
+    wishlist = rec_ref.get().to_dict()['wishlist']
 
-    msg_auth = ctx.message.author.id
+    user = client.get_user(int(author_id))
+    
+    await user.send(f'Here is the wishlist: {wishlist}')
+    
 
-    event_participants_dict = db.collection('event_participants').document(f'{event_id}').get().to_dict()
+ 
 
-    user = client.get_user(msg_auth)
-    ulist = event_participants_dict['participants'].get(f'{msg_auth}')
-
-    await user.send(f'Here is your wishlist: {ulist}')
-
-#Test          
+#Fix-Me     
 @client.command()
 async def randomize(ctx): 
-    user_dicts = [ item.to_dict() for item in db.collection('users').get() ]
+    pairs = {}
+    guild_id = ctx.message.guild.id
+    author_id = ctx.message.author.id
+
+   
+    event_ref = db.collection('events').document(f'{guild_id}')
+    event = event_ref.get().to_dict()
+    users = event['users']
+    host = event['host']
+
+    #host permission
+    if author_id != int(host): 
+        await ctx.send('Only the host can start random pairings :(')
+        return
+
+    #randomize list of users
+    random.shuffle(users)
+
+    #pairs users via Hamiltonian Cycle
+    for i in range(len(users)): 
+        pairs[users[i].id] = users[(i+1)%len(users)]
+
     
-    for user in user_dicts:
-        print(user['id'])
-        if user['id']  != 0: 
-            user = client.get_user(user['id'])
-            if user != None:
-                await user.send('Hello')
-            else: 
-                await ctx.send('failed:(')
-        print('--------------')
+    event_ref.update(pairs)
+    await ctx.send('Everyone has been randomly matched run !recipient in the server to get your recipient:)')
 
 
-client.run('')
+@client.command()
+async def recipient(ctx): 
+    guild_id = ctx.message.guild.id
+    author_id = ctx.message.author.id
+
+    event_ref = db.collection('events').document(f'{guild_id}')
+    event = event_ref.get().to_dict()
+
+    rec_ref = event[f'{author_id}']
+    rec_name = rec_ref.get().to_dict()['name']
+
+    user = client.get_user(author_id)
+
+    await user.send(f'Your recipient is {rec_name}!!! :santa: ')
+
+client.run('NzY1MzgxOTA3MTM5MTMzNTIw.X4T_cg.bUP9idQ9vItzCPJdjVQP-5Hd-aA')

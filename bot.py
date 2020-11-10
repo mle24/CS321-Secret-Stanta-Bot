@@ -10,8 +10,22 @@ cred = credentials.Certificate("./botprivatekey.json")
 firebase_admin.initialize_app(cred)
 # Initialize database client and discord bot
 db = firestore.client()
-bot = commands.Bot(command_prefix='!')
+bot = commands.Bot(command_prefix='!', help_command = None)
 
+
+@bot.event
+async def on_command_error(ctx, error): 
+    '''
+        Default Command Output
+    '''
+    if isinstance(error, commands.CommandNotFound): 
+        embed = discord.Embed(
+            colour = discord.Colour.red(), 
+            description = 'Command not recognized. Use !help to list commands'
+        )
+
+        await ctx.send(embed = embed)
+    raise error
 
 @bot.command()
 async def start(ctx):
@@ -26,21 +40,55 @@ async def start(ctx):
     author_id = ctx.message.author.id
     guild_id = ctx.message.guild.id
     event_ref = db.collection('events').document(f'{guild_id}')
+
+    msg = ''
     # Check if event exists in the events collection
     if not event_ref.get().exists:
         # If the event does not exist, create the event
         event_ref.set({
             'host': f'{author_id}',
-            'users': []
+            'users': [],
+            'pairs' : {}
         })
-        await ctx.send('Event has started! :christmas_tree:')
+        msg = 'Event has started! :christmas_tree:\n'
     else:
         # Send message if the event is already started
-        await ctx.send('Server already has an ongoing event! :christmas_tree:')
+        msg = 'Server already has an ongoing event! :christmas_tree:\n'
     # Send message on how the user can join the event
-    await ctx.send('If you would like to participate, use the !join command')
 
+    embed = discord.Embed(
+        colour = discord.Colour.red(), 
+        description = f'{msg} If you would like to participate, use the !join command'
+    )
 
+    
+    await ctx.send(embed = embed)
+
+@bot.command()
+async def help(ctx): 
+    '''
+        Custom Commands Menu
+    '''
+    descript = 'Secret Santa is the most convient way to celebrate the holidays with friends and family in your Discord Server.'
+    embed = discord.Embed(
+        title = "Commands Menu", 
+        colour = discord.Colour.red(),
+        description = f'{descript}'
+    )
+    
+    embed.set_author(name = "Secret Santa", icon_url='https://httpsimage.com/v2/410ead26-e041-499f-8b4d-ddbfce568350.png')
+    
+
+    embed.add_field(name='!start', value = 'Start an Event', inline=False)
+    embed.add_field(name='!join', value = 'Join the event', inline=False)
+    embed.add_field(name='!pair', value = 'Randomly pair participants', inline=False)
+    embed.add_field(name='!add', value = 'Add item to your wishlist', inline=False)
+    embed.add_field(name='!remove', value = 'Remove item from your wishlist', inline=False)
+    embed.add_field(name='!my_wishlist', value = 'Get your wishlist', inline=False)
+    embed.add_field(name='!wishlist', value = 'Get your recipient\'s wishlist', inline=False)
+    
+    await ctx.send(embed = embed)
+  
 @bot.command()
 async def join(ctx):
     '''
@@ -77,8 +125,15 @@ async def join(ctx):
     else:
         event_ref.update({'users': firestore.ArrayUnion([user_ref])})
         user_ref.update({'events': firestore.ArrayUnion([event_ref])})
-        await ctx.send(f'{ctx.message.author} has been added to the event! :partying_face:')
-        await user.send("Use this channel to add and remove items from your wishlist")
+        embed = discord.Embed(
+            colour = discord.Colour.red(), 
+            description = f'{ctx.message.author} has been added to the event! :partying_face:'
+        )
+
+        await ctx.send(embed = embed)
+        await user.send("Use this channel to add/remove items from your wishlist")
+        await user.send("Use this channel to also get items from your with the !my_wishlist")
+      
 
 
 @bot.command()
@@ -106,7 +161,11 @@ async def add(ctx, *args):
     # Update user refernece with the new array of items
     user_ref.update({'wishlist': firestore.ArrayUnion([f'{item}'])})
     user = bot.get_user(author_id)
-    await user.send(f"I have added {item} to your wishlist :upside_down:")
+    embed = discord.Embed(
+            colour = discord.Colour.red(), 
+            description = f"I have added {item} to your wishlist :upside_down:"
+    )
+    await user.send(embed = embed) 
 
 
 @bot.command()
@@ -117,46 +176,140 @@ async def remove(ctx, *args):
     # Get references to the user
     author_id = ctx.message.author.id
     user_ref = db.collection('users').document(f'{author_id}')
-    # Create item to be added into wishlist
-    item = " ".join(args)
+    user_wishlist = user_ref.get().to_dict()['wishlist']
+    
+    try: 
+        # Create item to be added into wishlist
+        index = int(" ".join(args))
+
+    except ValueError:
+         await ctx.send("To remove: !remove <item number>")
+         await ctx.send("Item number can be found above each item using !my_wishlist/!wishlist")
+         return
+
+    if(index > len(user_wishlist)): 
+        await ctx.send("Invalid Item Number")
+        await ctx.send("Item number can be found above each item using !my_wishlist/!wishlist")
+        return
+        
     # Make sure the user exists
     if not user_ref.get().exists:
         await ctx.send('You are not part of an event! Join one before removing items from your wishlist :smile:')
         return
+
     # User is not part of any event throughout Discord
     if len(user_ref.get().to_dict()['events']) == 0:
         await ctx.send('You are not part of an event! Join one before removing items from your wishlist :smile:')
         return
+
     # Alert user that their item can be seen in public
     user = bot.get_user(author_id)
     if not isinstance(ctx.channel, discord.channel.DMChannel):
         await user.send("Others can see the items you remove from your wishlist in a public channel! Be careful! :smile:")
+        return
+
     # Update user refernece and delete specified item
-    user_ref.update({'wishlist': firestore.ArrayRemove([f'{item}'])})
+    item = user_wishlist[index-1]
+    del user_wishlist[index-1]
+
+    user_ref.update({'wishlist': user_wishlist})
     user = bot.get_user(author_id)
-    await user.send(f"I have deleted {item} from your wishlist :upside_down:")
+
+    embed = discord.Embed(
+            colour = discord.Colour.red(), 
+            description = f"I have deleted {item} from your wishlist :upside_down:"
+    )
+    await user.send(embed = embed)
 
 
 @bot.command()
-async def wishlist(ctx):
+async def my_wishlist(ctx):
     '''
         Retrieve your wishlist
     '''
     # Get references to the user
     author_id = ctx.message.author.id
     user_ref = db.collection('users').document(f'{author_id}')
+    user_dict = user_ref.get().to_dict()
+
     # Make sure the user exists
     if not user_ref.get().exists:
         await ctx.send('You are not part of an event! Join one before viewing items in your wishlist :smile:')
         return
+
     # User is not part of any event throughout Discord
-    if len(user_ref.get().to_dict()['events']) == 0:
+    if len(user_dict['events']) == 0:
         await ctx.send('You are not part of an event! Join one before viewing items in your wishlist :smile:')
         return
+
+    
+
     user = bot.get_user(int(author_id))
     wishlist = user_ref.get().to_dict()['wishlist']
-    await user.send(f'Here is your wishlist: {wishlist}')
+    user = bot.get_user(int(author_id))
+    
+    embed = discord.Embed(
+        title = "Your Wishlist", 
+        colour = discord.Colour.red()
+    )
 
+    for i in range(len(wishlist)): 
+        embed.add_field(name = f'Item {i+1}', value= f'{wishlist[i]}', inline = False)
+    
+    
+
+    await user.send(embed=embed)
+
+@bot.command()
+async def wishlist(ctx): 
+    '''
+        Retrieve Recipient Wishlist
+    '''
+
+    author_id = ctx.message.author.id
+    user_ref = db.collection('users').document(f'{author_id}')
+    user_dict = user_ref.get().to_dict()
+    
+    # Make sure the user exists
+    if not user_ref.get().exists:
+        await ctx.send('You are not part of an event! Join one before viewing items in your wishlist :smile:')
+        return
+
+    # User is not part of any event throughout Discord
+    if len(user_dict['events']) == 0:
+        await ctx.send('You are not part of an event! Join one before viewing items in your wishlist :smile:')
+        return
+    
+    
+
+    user = bot.get_user(int(author_id))
+    if isinstance(ctx.channel, discord.channel.DMChannel):
+        await user.send('Use the !wishlist command in a server')
+
+    guild_id = ctx.message.guild.id
+    event_ref = db.collection('events').document(f'{guild_id}') 
+    event_dict = event_ref.get().to_dict()
+    
+        
+    #check if been paired 
+    if len(event_dict['pairs']) == 0 : 
+        await ctx.send('You have not been paired yet! Ask the host to start the pairing :smile:')
+        return
+
+    rec_ref = event_dict[f'pairs'][f'{author_id}'].get().to_dict()
+    wishlist = rec_ref['wishlist']
+
+    
+    
+    embed = discord.Embed(
+        title = f"{rec_ref['name']}\'s Wishlist", 
+        colour = discord.Colour.red()
+    )
+    for i in range(len(wishlist)): 
+        embed.add_field(name = f'Item {i+1}', value= f'{wishlist[i]}', inline = False)
+
+
+    await user.send(embed = embed)
 
 @bot.command()
 async def pair(ctx):
@@ -167,42 +320,66 @@ async def pair(ctx):
     if isinstance(ctx.channel, discord.channel.DMChannel):
         await ctx.send("This command can only be run in a server! :smile:")
         return
-    # Create empty dictionary for pairs
+
+    
     pairs = {}
     # Get references to the user and the server they are on
     author_id = ctx.message.author.id
     guild_id = ctx.message.guild.id
     event_ref = db.collection('events').document(f'{guild_id}')
+
     # Make sure an event is in progress
     if not event_ref.get().exists:
         await ctx.send('No event in progress, ask the event host to start one! :smile:')
         return
     event = event_ref.get().to_dict()
     users = event['users']
+
     # Make sure host is the only one calling this command
     if author_id != int(event['host']):
         host = bot.get_user(int(event['host']))
         await ctx.send(f'Only the event host can run this command. Ask {host.name}#{host.discriminator}! :smile:')
         return
+
     # Make sure there are users present in the event
     if len(users) == 0:
         await ctx.send('No users have joined the event! Ask them to join with the !join command :smile:')
         return
+
     # Randomize list of users
     random.shuffle(users)
+    
     # Pairs users via Hamiltonian Cycle
     for i in range(len(users)):
         pairs[users[i].id] = users[(i+1) % len(users)]
+
     # Update database
-    event_ref.update({"pairs": pairs})
+    event_ref.update({
+        "pairs": pairs,
+    })
+
+   
     # Loop through all the pairs and send them a message with who their pair is
     for key, value in pairs.items():
         user = bot.get_user(int(key))
         recipient = value.get().to_dict()['name']
-        recipient_wishlist = value.get().to_dict()['wishlist']
-        await user.send(f'Your recipient is {recipient}!!! :santa:\nHere is their wishlist: {recipient_wishlist} :smile:')
+        wishlist = value.get().to_dict()['wishlist']
+        embed = discord.Embed(
+            title = f"{recipient}\'s Wishlist", 
+            colour = discord.Colour.red()
+        )
+        for i in range(len(wishlist)): 
+            embed.add_field(name = f'Item {i+1}', value= f'{wishlist[i]}', inline = False)
+        
+        await user.send(f'Your recipient is {recipient}!!! :santa:')
+        await user.send(embed = embed)
+
     # Send a message to the guild stating that everyone has been paired
-    await ctx.send('Everyone who joined the event has been randomly paired! Check your direct messages to see who you are paired with. :smile:')
+    embed = discord.Embed(
+            colour = discord.Colour.red(), 
+            description = 'Everyone who joined the event has been randomly paired! Check your direct messages to see who you are paired with. :smile:'
+    )
+    await ctx.send(embed = embed)
 
 
 bot.run('')

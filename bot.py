@@ -336,4 +336,4 @@ async def pair(ctx):
     await ctx.send(embed=embed)
 
 
-bot.run("NzY1MzgxOTA3MTM5MTMzNTIw.X4T_cg.M6zHSd6aDLa0MU79Px8Zmp8VZ58")
+bot.run("")

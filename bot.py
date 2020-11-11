@@ -55,11 +55,9 @@ async def start(ctx):
     )
     await ctx.send(embed=embed)
 
-
-@bot.command()
-async def help(ctx):
+def get_help_message():
     """
-    Custom Commands Menu
+        Return an embedded help message that will list the available commands
     """
     # Create am embeded message that contains help commands and how each command works
     description = "Secret Santa is the most convient way to celebrate the holidays with friends and family in your Discord Server."
@@ -73,10 +71,19 @@ async def help(ctx):
     embed.add_field(name="!start", value="Start an Event", inline=False)
     embed.add_field(name="!join", value="Join the event", inline=False)
     embed.add_field(name="!pair", value="Randomly pair participants", inline=False)
-    embed.add_field(name="!add", value="Add item to your wishlist", inline=False)
-    embed.add_field(name="!remove", value="Remove item from your wishlist", inline=False)
+    embed.add_field(name="!add ITEM_NAME", value="Add item to your wishlist", inline=False)
+    embed.add_field(name="!remove ITEM_NUMBER", value="Remove item from your wishlist", inline=False)
     embed.add_field(name="!my_wishlist", value="Get your wishlist", inline=False)
     embed.add_field(name="!wishlist", value="Get your recipient's wishlist", inline=False)
+    return embed
+
+@bot.command()
+async def help(ctx):
+    """
+    Custom Commands Menu by calling get_help_message
+    """
+    # Get help message and send to user
+    embed = get_help_message()
     await ctx.send(embed=embed)
 
 
@@ -123,8 +130,8 @@ async def join(ctx):
             description=f"{ctx.message.author} has been added to the event! :partying_face:",
         )
         await ctx.send(embed=embed)
-        await user.send("Use this channel to add/remove items from your wishlist")
-        await user.send("Use this channel to also get items from your with the !my_wishlist")
+        await user.send(embed=get_help_message())
+        await user.send("Use this channel to add/remove items from your wishlist\nUse this channel to also get items from your with the !my_wishlist :smile:")
 
 
 @bot.command()
@@ -329,4 +336,4 @@ async def pair(ctx):
     await ctx.send(embed=embed)
 
 
-bot.run("")
+bot.run("NzY1MzgxOTA3MTM5MTMzNTIw.X4T_cg.M6zHSd6aDLa0MU79Px8Zmp8VZ58")

@@ -1,4 +1,4 @@
-# CS321-007 Secret Santa Bot
+# CS321-007 Team 8 Secret Santa Bot
 
 Secret Santa is the most convient way to celebrate the holidays with friends and family in your Discord Server.
 
